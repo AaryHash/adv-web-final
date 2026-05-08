@@ -30,18 +30,14 @@ let productsList = [
 // For localStorage functionality
 let savedCart = [
   // {
-  //   id: '1',
   //   productId: 'bottle',
   //   price: 20,
   //   quantity: 1,
-  //   deletedAt: '',
   // },
   // {
-  //   id: '2',
   //   productId: 'coasters',
   //   price: 27,
   //   quantity: 2,
-  //   deletedAt: '',
   // },
 ];
 
@@ -64,8 +60,7 @@ try {
     savedCart = [...data];
   }
   savedCart.forEach(function (item) {
-    if (!item.deletedAt)
-      addCartItem(item.productId, item.id, item.quantity, true);
+    if (!item.deletedAt) addCartItem(item.productId, item.quantity, true);
   });
 } catch (err) {
   console.error(err);
@@ -100,70 +95,83 @@ function addProduct(productObj) {
 }
 
 // Creates items for cart
-function addCartItem(productId, uniqueId = 0, amt = 1, isSaved = false) {
-  productsList.forEach(function (product) {
-    if (product.id === productId) {
-      if (!uniqueId) uniqueId = Date.now();
-      let container = createEl('div', uniqueId, ['cart-item']);
-      let name = createEl('p');
-      name.innerText = `${product.name}
+function addCartItem(productId, amt = 1, isSaved = false) {
+  let exists = false;
+  if (!isSaved) {
+    let cartItems = document.querySelectorAll('.cart-item');
+
+    cartItems.forEach(function (item) {
+      if (item.dataset.item === productId) {
+        let quantity = item.querySelector('.quantity');
+        quantity.stepUp();
+        quantity.dispatchEvent(new Event('change'));
+        exists = true;
+      }
+    });
+  }
+  if (!exists) {
+    productsList.forEach(function (product) {
+      if (product.id === productId) {
+        let container = createEl('div', '', ['cart-item']);
+        container.dataset.item = product.id;
+        let name = createEl('p');
+        name.innerText = `${product.name}
       `;
 
-      let btn = createEl('button', '', ['remove-btn']);
-      btn.innerText = 'Remove';
-      btn.dataset.item = uniqueId;
-      btn.addEventListener('click', function (event) {
-        removeCartItem(event.target.dataset.item);
-      });
-      name.append(btn);
-
-      let price = createEl('p', '', ['price']);
-      price.innerText = `$${product.price.toFixed(2)}`;
-
-      let quantity = createEl('input', '', ['quantity']);
-      quantity.type = 'number';
-      quantity.min = '1';
-      quantity.value = amt;
-      quantity.dataset.item = uniqueId;
-      quantity.addEventListener('change', updateSubtotal);
-
-      let subtotal = createEl('p', '', ['subtotal']);
-      subtotal.innerText = `$${(product.price * amt).toFixed(2)}`;
-      subtotal.dataset.item = uniqueId;
-
-      container.append(name);
-      container.append(price);
-      container.append(quantity);
-      container.append(subtotal);
-      cartTarget.append(container);
-
-      if (!isSaved) {
-        savedCart.push({
-          id: uniqueId,
-          productId: product.id,
-          price: product.price,
-          quantity: amt,
-          deletedAt: '',
+        let btn = createEl('button', '', ['remove-btn']);
+        btn.innerText = 'Remove';
+        btn.dataset.item = product.id;
+        btn.addEventListener('click', function (event) {
+          removeCartItem(event.target.dataset.item);
         });
-      }
+        name.append(btn);
 
-      updateSummary();
-    }
-  });
+        let price = createEl('p', '', ['price']);
+        price.innerText = `$${product.price.toFixed(2)}`;
+
+        let quantity = createEl('input', '', ['quantity']);
+        quantity.type = 'number';
+        quantity.min = '1';
+        quantity.value = amt;
+        quantity.dataset.item = product.id;
+        quantity.addEventListener('change', updateSubtotal);
+
+        let subtotal = createEl('p', '', ['subtotal']);
+        subtotal.innerText = `$${(product.price * amt).toFixed(2)}`;
+        subtotal.dataset.item = product.id;
+
+        container.append(name);
+        container.append(price);
+        container.append(quantity);
+        container.append(subtotal);
+        cartTarget.append(container);
+        if (!isSaved) {
+          savedCart.push({
+            productId: product.id,
+            price: product.price,
+            quantity: amt,
+          });
+        }
+        updateSummary();
+      }
+    });
+  }
 }
 
 // Removes item from cart and storage
 function removeCartItem(id) {
   let cartItems = document.querySelectorAll('.cart-item');
   cartItems.forEach(function (item) {
-    if (+item.id === +id) item.remove();
+    if (item.dataset.item === id) item.remove();
   });
 
+  let tempArr = [];
   savedCart.forEach(function (item) {
-    if (+item.id === +id) {
-      item.deletedAt = Date.now();
+    if (item.productId !== id) {
+      tempArr.push(item);
     }
   });
+  savedCart = JSON.parse(JSON.stringify(tempArr));
 
   updateSummary();
 }
@@ -173,9 +181,9 @@ function updateSubtotal(event) {
   let quantity = event.target;
   let value = +quantity.value;
   let subtotal = quantity.parentElement.querySelector('.subtotal');
-  
+
   savedCart.forEach(function (item) {
-    if (+item.id === +quantity.dataset.item) {
+    if (item.productId === quantity.dataset.item) {
       if (value < 1 || isNaN(value)) {
         quantity.value = 1;
         item.quantity = 1;
@@ -195,10 +203,8 @@ function updateSummary() {
   let total = 0;
 
   savedCart.forEach(function (item) {
-    if (!item.deletedAt) {
-      total += item.price * item.quantity;
-      items += item.quantity;
-    }
+    total += item.price * item.quantity;
+    items += item.quantity;
   });
 
   if (items === 1) {
